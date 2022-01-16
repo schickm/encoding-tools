@@ -1,6 +1,7 @@
 import { execCommand } from "./adapters.ts";
 
 export async function makeTorrent(source: string, announceUrl: string) {
+  const torrentFile = `${source}.torrent`;
   await execCommand([
     "imdl",
     "torrent",
@@ -13,6 +14,7 @@ export async function makeTorrent(source: string, announceUrl: string) {
     "--input",
     source,
     "--output",
-    `${source}.torrent`,
+    torrentFile,
   ]);
+  return torrentFile;
 }

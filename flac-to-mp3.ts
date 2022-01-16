@@ -24,15 +24,13 @@ import { makePromptCache } from "./prompt-cache.ts";
 import { makeTorrent } from "./torrent.ts";
 import { withTempDir } from "./with-temp.ts";
 import * as colors from "https://deno.land/std@0.114.0/fmt/colors.ts";
+import settings from "./settings.ts";
+import { execCommand } from "./adapters.ts";
 
 const {
   args: [inputDir, cliOutputDir],
-  options,
 } = await new Command()
   .arguments("<input_dir> [<output_dir>]")
-  .env("ANNOUNCE_URL=<value:string>", "Announce URL to put into torrent", {
-    required: true,
-  })
   .name("flac-to-mp3")
   .parse(Deno.args);
 
@@ -45,11 +43,18 @@ const ART_FILES = ["jpg", "png", "jpeg"];
 
 await withTempDir(async (workDir) => {
   makeOutputDirectory();
+
   await processFiles(workDir);
-  await makeTorrent(
+
+  const torrentFilePath = await makeTorrent(
     outputDir,
-    options.announceUrl,
+    settings.announceUrl,
   );
+
+  if (await Toggle.prompt("SCP files?")) {
+    await execCommand(["scp", "-r", outputDir, settings.scpMedia]);
+    await execCommand(["scp", "-r", torrentFilePath, settings.scpTorrent]);
+  }
 })();
 
 function makeOutputDirectory() {
@@ -75,7 +80,10 @@ async function processFiles(workDir: string) {
   const transformers = [
     chainTransformers(workDir, [
       decodeFlac,
-      makeTransformer(ALL_FILES, findArt(files, Select.prompt)),
+      makeTransformer(
+        ALL_FILES,
+        findArt(files, (...args) => Select.prompt(...args)),
+      ),
       makeTransformer(
         ALL_FILES,
         promptForMeta(
